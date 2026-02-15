@@ -1,7 +1,4 @@
 import { useState, useRef, useEffect } from 'react';
-import { startScheduler, stopAllAgents, getSchedulerStatus, triggerAgent } from '../services/scheduler';
-// import { postToLinkedIn, searchTrendingTopics } from '../services/linkedinBot';
-import { createLinkedInPostAgent, createLinkedInCommentAgent, listAllAgents } from '../services/agentService';
 
 export default function ChatWindow() {
   const [messages, setMessages] = useState([
@@ -23,212 +20,257 @@ export default function ChatWindow() {
   }, [messages]);
 
   const handleSend = async () => {
-  if (!input.trim()) return;
+    if (!input.trim()) return;
 
-  const userMessage = { role: 'user', content: input };
-  setMessages(prev => [...prev, userMessage]);
-  const userInput = input;
-  setInput('');
-  setIsLoading(true);
+    const userMessage = { role: 'user', content: input };
+    setMessages(prev => [...prev, userMessage]);
+    const userInput = input;
+    setInput('');
+    setIsLoading(true);
 
-  await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-  try {
-    const lowerInput = userInput.toLowerCase();
-
-    // Start scheduler
-if (lowerInput.includes('start') && lowerInput.includes('scheduler')) {
-  startScheduler();
-  const aiMessage = { 
-    role: 'assistant', 
-    content: '⏰ **Scheduler Started!**\n\nAll active agents are now running on their schedules.\n\nYour agents will execute automatically:\n• Trending Agent: Daily at 9:00 AM\n• Comment Bot: Every hour\n\nType "scheduler status" to see running jobs.' 
-  };
-  setMessages(prev => [...prev, aiMessage]);
-  setIsLoading(false);
-  return;
-}
-
-// Scheduler status
-if (lowerInput.includes('scheduler') && lowerInput.includes('status')) {
-  const status = getSchedulerStatus();
-  
-  let responseText = `⏰ **Scheduler Status**\n\n`;
-  responseText += `Running Jobs: ${status.running}\n\n`;
-  
-  if (status.jobs.length === 0) {
-    responseText += 'No jobs scheduled.\n\nType "start scheduler" to begin.';
-  } else {
-    responseText += '**Active Jobs:**\n\n';
-    status.jobs.forEach((job, idx) => {
-      responseText += `${idx + 1}. ${job.name}\n   Schedule: ${job.schedule}\n   Type: ${job.type}\n\n`;
-    });
-  }
-  
-  const aiMessage = { role: 'assistant', content: responseText };
-  setMessages(prev => [...prev, aiMessage]);
-  setIsLoading(false);
-  return;
-}
-
-// Stop scheduler
-if (lowerInput.includes('stop') && lowerInput.includes('scheduler')) {
-  stopAllAgents();
-  const aiMessage = { 
-    role: 'assistant', 
-    content: '⏹️ **Scheduler Stopped**\n\nAll scheduled jobs have been stopped.\n\nType "start scheduler" to resume.' 
-  };
-  setMessages(prev => [...prev, aiMessage]);
-  setIsLoading(false);
-  return;
-}
-
-// Run agent now (manual trigger)
-if (lowerInput.includes('run') && lowerInput.includes('agent')) {
-  const agents = listAllAgents();
-  
-  if (agents.length === 0) {
-    const aiMessage = { 
-      role: 'assistant', 
-      content: '❌ No agents found.\n\nCreate an agent first!' 
-    };
-    setMessages(prev => [...prev, aiMessage]);
-    setIsLoading(false);
-    return;
-  }
-  
-  // Run the first agent for demo
-  const agent = agents[0];
-  
-  const aiMessage = { 
-    role: 'assistant', 
-    content: `🚀 Running agent: **${agent.name}**\n\nThis may take a few seconds...` 
-  };
-  setMessages(prev => [...prev, aiMessage]);
-  setIsLoading(false);
-  
-  setTimeout(async () => {
     try {
-      await triggerAgent(agent.id);
-      const resultMessage = {
+      const lowerInput = userInput.toLowerCase();
+
+      // ===== CREATE LINKEDIN TRENDING AGENT =====
+      if ((lowerInput.includes('create') || lowerInput.includes('make')) && 
+          (lowerInput.includes('linkedin') || lowerInput.includes('trending') || lowerInput.includes('post'))) {
+        
+        try {
+          const response = await fetch('http://127.0.0.1:8000/create-agent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: "LinkedIn Trending Agent",
+              description: "Posts trending topics to LinkedIn daily",
+              agent_type: "linkedin_trending",
+              schedule: "daily"
+            })
+          });
+
+          const data = await response.json();
+          
+          if (data.success && data.agent) {
+            const aiMessage = {
+              role: 'assistant',
+              content: `✅ **LinkedIn Agent Created!**\n\n📝 **Name:** ${data.agent.name}\n📊 **Type:** Trending Post Agent\n⏰ **Schedule:** Posts daily at 9 AM\n\n**What it does:**\n• Searches for trending OpenClaw topics\n• Generates engaging LinkedIn posts\n• Waits for your approval\n• Posts automatically\n\n🎯 Your agent is ready! Type "show my agents" to see all.`
+            };
+            setMessages(prev => [...prev, aiMessage]);
+          } else {
+            const errorMessage = {
+              role: 'assistant',
+              content: `❌ **Error:** ${data.message || 'Could not create agent'}\n\nPlease try again.`
+            };
+            setMessages(prev => [...prev, errorMessage]);
+          }
+        } catch (error) {
+          const errorMessage = {
+            role: 'assistant',
+            content: `❌ **Connection Error**\n\nCould not reach backend at http://127.0.0.1:8000\n\nMake sure backend is running:\n\`cd backend\`\n\`python main.py\``
+          };
+          setMessages(prev => [...prev, errorMessage]);
+        }
+        
+        setIsLoading(false);
+        return;
+      }
+
+      // ===== CREATE COMMENT BOT AGENT =====
+      if ((lowerInput.includes('create') || lowerInput.includes('make')) && 
+          (lowerInput.includes('comment') || lowerInput.includes('hashtag'))) {
+        
+        try {
+          const response = await fetch('http://127.0.0.1:8000/create-agent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: "Hashtag Comment Bot",
+              description: "Comments on posts with #openclaw hashtag",
+              agent_type: "linkedin_comment",
+              schedule: "hourly"
+            })
+          });
+
+          const data = await response.json();
+          
+          if (data.success && data.agent) {
+            const aiMessage = {
+              role: 'assistant',
+              content: `✅ **Comment Bot Created!**\n\n📝 **Name:** ${data.agent.name}\n🏷️ **Hashtag:** #openclaw\n⏰ **Schedule:** Runs every hour\n\n**What it does:**\n• Searches for posts with #openclaw\n• Adds promotional comments\n• Logs all activity\n\n🎯 Bot is active!`
+            };
+            setMessages(prev => [...prev, aiMessage]);
+          } else {
+            const errorMessage = {
+              role: 'assistant',
+              content: `❌ **Error:** ${data.message || 'Could not create bot'}`
+            };
+            setMessages(prev => [...prev, errorMessage]);
+          }
+        } catch (error) {
+          const errorMessage = {
+            role: 'assistant',
+            content: `❌ **Connection Error**\n\nBackend not reachable. Please start it first.`
+          };
+          setMessages(prev => [...prev, errorMessage]);
+        }
+
+        setIsLoading(false);
+        return;
+      }
+
+      // ===== LIST ALL AGENTS =====
+      if (lowerInput.includes('show') || lowerInput.includes('list') || lowerInput.includes('my agents')) {
+        try {
+          const response = await fetch('http://127.0.0.1:8000/list-agents');
+          const data = await response.json();
+
+          if (data.success && data.agents) {
+            let agentsList = `📋 **Your Agents** (${data.agents.length} total)\n\n`;
+
+            if (data.agents.length === 0) {
+              agentsList = `📋 **No agents yet!**\n\nCreate your first agent:\n• "Create a LinkedIn trending agent"\n• "Make a hashtag comment bot"`;
+            } else {
+              data.agents.forEach((agent, idx) => {
+                agentsList += `${idx + 1}. **${agent.name}**\n`;
+                agentsList += `   Type: ${agent.type}\n`;
+                agentsList += `   Status: ${agent.status}\n\n`;
+              });
+            }
+
+            const aiMessage = {
+              role: 'assistant',
+              content: agentsList
+            };
+            setMessages(prev => [...prev, aiMessage]);
+          } else {
+            const errorMessage = {
+              role: 'assistant',
+              content: `❌ Could not fetch agents`
+            };
+            setMessages(prev => [...prev, errorMessage]);
+          }
+        } catch (error) {
+          const errorMessage = {
+            role: 'assistant',
+            content: `❌ **Connection Error**\n\nCannot connect to backend.`
+          };
+          setMessages(prev => [...prev, errorMessage]);
+        }
+
+        setIsLoading(false);
+        return;
+      }
+
+      // ===== FILE OPERATIONS =====
+      if (lowerInput.includes('organize') || lowerInput.includes('file')) {
+        try {
+          const response = await fetch('http://127.0.0.1:8000/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: userInput })
+          });
+
+          const data = await response.json();
+          
+          const aiMessage = {
+            role: 'assistant',
+            content: data.message || '✅ File operation completed!'
+          };
+
+          setMessages(prev => [...prev, aiMessage]);
+        } catch (error) {
+          const errorMessage = {
+            role: 'assistant',
+            content: `❌ Error: Backend not responding`
+          };
+          setMessages(prev => [...prev, errorMessage]);
+        }
+
+        setIsLoading(false);
+        return;
+      }
+
+      // ===== RESEARCH =====
+      if (lowerInput.includes('research') || lowerInput.includes('search') || lowerInput.includes('find')) {
+        try {
+          const response = await fetch('http://127.0.0.1:8000/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: userInput })
+          });
+
+          const data = await response.json();
+          
+          const aiMessage = {
+            role: 'assistant',
+            content: data.message || '🔍 Research completed!'
+          };
+
+          setMessages(prev => [...prev, aiMessage]);
+        } catch (error) {
+          const errorMessage = {
+            role: 'assistant',
+            content: `❌ Error: Backend not responding`
+          };
+          setMessages(prev => [...prev, errorMessage]);
+        }
+
+        setIsLoading(false);
+        return;
+      }
+
+      // ===== WRITING =====
+      if (lowerInput.includes('write') || lowerInput.includes('draft')) {
+        try {
+          const response = await fetch('http://127.0.0.1:8000/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: userInput })
+          });
+
+          const data = await response.json();
+          
+          const aiMessage = {
+            role: 'assistant',
+            content: data.message || '✍️ Content created!'
+          };
+
+          setMessages(prev => [...prev, aiMessage]);
+        } catch (error) {
+          const errorMessage = {
+            role: 'assistant',
+            content: `❌ Error: Backend not responding`
+          };
+          setMessages(prev => [...prev, errorMessage]);
+        }
+
+        setIsLoading(false);
+        return;
+      }
+
+      // ===== HELP / DEFAULT =====
+      const aiMessage = {
         role: 'assistant',
-        content: `✅ Agent executed successfully!\n\nCheck the logs for details.`
+        content: `I can help you with:\n\n🤖 **Create Agents:**\n• "Create a LinkedIn trending agent"\n• "Make a hashtag comment bot"\n\n📁 **File Operations:**\n• "Organize my downloads"\n• "List my files"\n\n🔍 **Research:**\n• "Research AI automation"\n• "Search for trending topics"\n\n✍️ **Writing:**\n• "Write about machine learning"\n• "Create a blog post"\n\n📊 **Manage:**\n• "Show my agents"\n• "List all agents"\n\nWhat would you like to do?`
       };
-      setMessages(prev => [...prev, resultMessage]);
+
+      setMessages(prev => [...prev, aiMessage]);
+
     } catch (error) {
+      console.error('Error:', error);
       const errorMessage = {
         role: 'assistant',
-        content: `❌ Error: ${error.message}`
+        content: `❌ **Unexpected Error**\n\n${error.message}\n\nPlease check that the backend is running.`
       };
       setMessages(prev => [...prev, errorMessage]);
     }
-  }, 1000);
-  
-  return;
-}
 
-    // Create trending post agent
-    if (lowerInput.includes('create') && (lowerInput.includes('post') || lowerInput.includes('trending'))) {
-      const agent = await createLinkedInPostAgent(
-        'Trending Topics Agent',
-        'Posts trending OpenClaw topics daily to LinkedIn'
-      );
-
-      const responseText = `✅ **Agent Created Successfully!**\n\n📝 Name: ${agent.name}\n📊 Type: ${agent.type}\n⏰ Schedule: ${agent.schedule}\n\nThis agent will:\n• Search for trending OpenClaw topics\n• Generate a LinkedIn post\n• Wait for your approval\n• Post automatically\n\n🎯 Your agent is ready!`;
-      
-      const aiMessage = { role: 'assistant', content: responseText };
-      setMessages(prev => [...prev, aiMessage]);
-      setIsLoading(false);
-      return;
-    }
-
-    // Create comment bot
-    if (lowerInput.includes('comment') || (lowerInput.includes('create') && lowerInput.includes('hashtag'))) {
-      const agent = await createLinkedInCommentAgent(
-        'Hashtag Comment Bot',
-        'openclaw',
-        'Great to see OpenClaw being discussed! Check out our desktop assistant: [link]'
-      );
-
-      const responseText = `✅ **Comment Bot Created!**\n\n📝 Name: ${agent.name}\n🏷️ Hashtag: #${agent.hashtag}\n⏰ Schedule: ${agent.schedule}\n\nThis bot will:\n• Search for #openclaw posts\n• Add promotional comments\n• Run every hour\n\n🎯 Bot is active!`;
-      
-      const aiMessage = { role: 'assistant', content: responseText };
-      setMessages(prev => [...prev, aiMessage]);
-      setIsLoading(false);
-      return;
-    }
-    // Test LinkedIn posting
-if (lowerInput.includes('test') && lowerInput.includes('post')) {
-  const aiMessage = { 
-    role: 'assistant', 
-    content: '🚀 Testing LinkedIn post...\n\nA browser window will open. Please:\n1. Log in to LinkedIn\n2. Wait for the post to be created\n\nThis may take 1-2 minutes...' 
+    setIsLoading(false);
   };
-  setMessages(prev => [...prev, aiMessage]);
-  setIsLoading(false);
-  
-  // Post to LinkedIn in background
-  setTimeout(async () => {
-    const testContent = '🚀 Testing my new OpenClaw Desktop Assistant!\n\nThis post was created automatically using browser automation. #OpenClaw #Automation';
-    
-    const result = await postToLinkedIn(testContent, false); // false = visible browser
-    
-    const resultMessage = {
-      role: 'assistant',
-      content: result.success 
-        ? '✅ Post published successfully!\n\nCheck your LinkedIn profile!' 
-        : `❌ Error: ${result.error}\n\nPlease try again.`
-    };
-    setMessages(prev => [...prev, resultMessage]);
-  }, 1000);
-  
-  return;
-}
-
-    // List agents
-    if (lowerInput.includes('list') || lowerInput.includes('show')) {
-      const agents = listAllAgents();
-      
-      let responseText = `📋 **Your Agents** (${agents.length} total)\n\n`;
-      
-      if (agents.length === 0) {
-        responseText = '📋 You don\'t have any agents yet.\n\nTry: "Create a trending post agent"';
-      } else {
-        agents.forEach((agent, idx) => {
-          responseText += `${idx + 1}. **${agent.name}**\n   Type: ${agent.type}\n   Status: ${agent.status}\n   Created: ${new Date(agent.created_at).toLocaleDateString()}\n\n`;
-        });
-      }
-
-      const aiMessage = { role: 'assistant', content: responseText };
-      setMessages(prev => [...prev, aiMessage]);
-      setIsLoading(false);
-      return;
-    }
-
-    // Default response
-    const aiMessage = { 
-      role: 'assistant', 
-      content: `You said: "${userInput}"\n\n💡 Try:\n• "Create a trending post agent"\n• "Create a hashtag comment bot"\n• "Show my agents"` 
-    };
-    setMessages(prev => [...prev, aiMessage]);
-    
-  } catch (error) {
-    console.error('Error:', error);
-    const errorMessage = { 
-      role: 'assistant', 
-      content: `❌ Error: ${error.message}\n\nPlease try again.`
-    };
-    setMessages(prev => [...prev, errorMessage]);
-  }
-
-  setIsLoading(false);
-};
 
   return (
     <div className="chat-container">
-      <div className="header">
-        <h1>🤖 OpenClaw Assistant</h1>
-        <p>AI-Powered LinkedIn Automation</p>
-      </div>
-
       <div className="messages">
         {messages.map((msg, idx) => (
           <div key={idx} className={`message ${msg.role}`}>
@@ -262,7 +304,7 @@ if (lowerInput.includes('test') && lowerInput.includes('post')) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Type something..."
+            placeholder="Ask me anything..."
             className="input-box"
           />
           <button
